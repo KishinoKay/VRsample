@@ -13,7 +13,10 @@ public class BowController : MonoBehaviour
     public float maxPullDistance = 0.5f;
     public float shotPower = 20f;
     public Transform nockPoint;
-
+    [Tooltip("矢が乗る場所（弓の持ち手付近）のTransformを指定してください")]
+    public Transform arrowRestPoint;
+    [Header("自分自身のコライダー（発射時の干渉防止用）")]
+    public Collider[] bowColliders;
     [Header("ハンドリング参照")]
     public Transform holdingHand;
     
@@ -43,21 +46,29 @@ public class BowController : MonoBehaviour
         }
     }
 
-    private void UpdateBowPull()
+private void UpdateBowPull()
     {
         float dist = Vector3.Distance(holdingHand.position, pullingHand.position);
         float pullValue = Mathf.Clamp01(dist / maxPullDistance);
         bowAnimator.Play(stateHash, 0, pullValue);
         bowAnimator.speed = 0; 
 
-        // 矢がある場合のみ、矢の位置を弦に追従させる
+        // 矢がある場合のみ、矢の位置と回転を制御
         if(currentArrow != null)
         {
             currentArrow.transform.position = nockPoint.position;
-            currentArrow.transform.rotation = nockPoint.rotation;
+
+            Vector3 targetPosition = arrowRestPoint != null ? arrowRestPoint.position : transform.position;
+            Vector3 direction = targetPosition - nockPoint.position;
+
+            if (direction.sqrMagnitude > 0.001f)
+            {
+                // 【変更】LookRotationで向きを合わせた後、X軸に90度回転を加えて「寝かせる」
+                // ※もしこれでも向きがおかしい場合は 90 を -90 に変えてみてください
+                currentArrow.transform.rotation = Quaternion.LookRotation(direction) * Quaternion.Euler(90, 0, 0);
+            }
         }
     }
-
     // ---------------------------------------------------------
     // XR Events
     // ---------------------------------------------------------
@@ -123,17 +134,41 @@ public class BowController : MonoBehaviour
     {
         // 矢がない、またはセットされていないなら終了（空撃ち防止）
         if (!isNocked || currentArrow == null) return;
-
         currentArrow.transform.SetParent(null);
-
+        currentArrow.transform.localScale = Vector3.one;
         Rigidbody rb = currentArrow.GetComponent<Rigidbody>();
         
         // ★ここで ArrowController を取得しておく
         ArrowController arrowCtrl = currentArrow.GetComponent<ArrowController>();
+        Collider[] arrowCols = currentArrow.GetComponentsInChildren<Collider>();
 
         if (rb)
         {
             rb.isKinematic = false;
+            // コライダーを有効化する前に...
+            foreach(var arrowCol in arrowCols)
+            {
+                arrowCol.enabled = true;
+
+                // ★追加: 弓のコライダーとの衝突を無視させる
+                if (bowColliders != null)
+                {
+                    foreach (var bowCol in bowColliders)
+                    {
+                        Physics.IgnoreCollision(arrowCol, bowCol, true);
+                    }
+                }
+                
+                // ★追加: もし持ち手(holdingHand)にコライダーがあればそれも無視させる
+                if (holdingHand != null)
+                {
+                    Collider handCol = holdingHand.GetComponent<Collider>();
+                    if (handCol != null)
+                    {
+                        Physics.IgnoreCollision(arrowCol, handCol, true);
+                    }
+                }
+            }
             Collider col = currentArrow.GetComponent<Collider>();
             if (col) col.enabled = true;
 

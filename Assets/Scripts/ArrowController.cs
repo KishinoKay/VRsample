@@ -20,10 +20,12 @@ public class ArrowController : MonoBehaviour
 
     void FixedUpdate()
     {
-        // isFlyingがtrueの時だけ、矢の向きを変える
+// isFlyingがtrueの時だけ、矢の向きを変える
         if (isFlying && !rb.isKinematic && rb.velocity.sqrMagnitude > 0.1f)
         {
-            transform.rotation = Quaternion.LookRotation(rb.velocity);
+            // ★変更: 飛んでいる最中も、モデルの向きに合わせて90度回転させる
+            // (もし前後逆になるなら -90 に、裏返しなら 0,180,0 など調整してください)
+            transform.rotation = Quaternion.LookRotation(rb.velocity) * Quaternion.Euler(90, 0, 0);
         }
     }
 
