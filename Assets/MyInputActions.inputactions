@@ -6,7 +6,7 @@
             "id": "0c348442-7ffd-463c-94bc-22939a2fc36d",
             "actions": [
                 {
-                    "name": "Shoot",
+                    "name": "RightGrab",
                     "type": "Button",
                     "id": "a0345891-c2f2-441e-9d9d-302e9d812624",
                     "expectedControlType": "",
@@ -22,6 +22,15 @@
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
+                },
+                {
+                    "name": "LeftGrab",
+                    "type": "Button",
+                    "id": "45f149c2-ca89-4912-9b18-8e50d85cd4df",
+                    "expectedControlType": "",
+                    "processors": "",
+                    "interactions": "",
+                    "initialStateCheck": false
                 }
             ],
             "bindings": [
@@ -32,7 +41,7 @@
                     "interactions": "",
                     "processors": "",
                     "groups": "",
-                    "action": "Shoot",
+                    "action": "RightGrab",
                     "isComposite": false,
                     "isPartOfComposite": false
                 },
@@ -44,6 +53,17 @@
                     "processors": "",
                     "groups": "",
                     "action": "SwitchCamera",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "2e549628-397e-40a1-96ea-0edb33ff4cc7",
+                    "path": "<XRController>{LeftHand}/{TriggerButton}",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "LeftGrab",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

@@ -1,197 +1,211 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 
 public class BowController : MonoBehaviour
 {
-    [Header("アニメーション設定")]
-    public Animator bowAnimator;
-    public string stateName = "DrawBow";
+    [Header("参照")]
+    [SerializeField] private Animator bowAnimator;
+    [SerializeField] private Transform nockPoint;      // 弦の中心
+    // 矢の先端側の支点
+    [Tooltip("左手で弓を持った時に使う位置（右利きの人用）")]
+    [SerializeField] private Transform restPointForLeftHandHolder; 
     
-    [Header("物理・パラメータ設定")]
-    public float maxPullDistance = 0.5f;
-    public float shotPower = 20f;
-    public Transform nockPoint;
-    [Tooltip("矢が乗る場所（弓の持ち手付近）のTransformを指定してください")]
-    public Transform arrowRestPoint;
-    [Header("自分自身のコライダー（発射時の干渉防止用）")]
-    public Collider[] bowColliders;
-    [Header("ハンドリング参照")]
-    public Transform holdingHand;
-    
-    // 内部変数
-    private Transform pullingHand; 
-    private GameObject currentArrow; 
-    private bool isNocked = false;
-    private int stateHash;
+    [Tooltip("右手で弓を持った時に使う位置（左利きの人用）")]
+    [SerializeField] private Transform restPointForRightHandHolder;
+    [SerializeField] private Collider[] bowColliders;  // 自分自身のコライダー群
 
-    void Start()
+    [Header("パラメータ")]
+    [SerializeField] private float maxPullDistance = 0.5f;
+    [SerializeField] private float shotPower = 20f;
+    [SerializeField] private string drawAnimStateName = "DrawBow";
+    [SerializeField] private Vector3 arrowRotationOffset = new Vector3(90, 0, 0); // 矢のモデル補正
+    [Header("アローレスト設定")]
+
+    // 状態管理
+    private Transform _holdingHand; // 弓を持っている手
+    private Transform _pullingHand; // 弦を引いている手
+    // 現在使用中のレストポイント
+    private Transform _activeRestPoint;
+    private ArrowController _currentArrow;
+    private int _animStateHash;
+    private bool _isPulled = false;
+
+    private void Start()
     {
-        stateHash = Animator.StringToHash(stateName);
+        _animStateHash = Animator.StringToHash(drawAnimStateName);
     }
 
-    void Update()
+    private void Update()
     {
-        // 【修正点1】 && isNocked を削除しました。
-        // これにより、矢を持っていなくても弦を引くアニメーションが動くようになります。
-        if (holdingHand != null && pullingHand != null)
+        // 弦を引いている手が有効な場合のみ更新
+        if (_pullingHand != null && _holdingHand != null)
         {
-            UpdateBowPull();
+            UpdatePullingProcess();
+        }
+        else if (_isPulled)
+        {
+            // 引いていないのに引かれている状態が残っている場合のリセット（安全策）
+            ResetBowString();
+        }
+    }
+
+    private void UpdatePullingProcess()
+    {
+        _isPulled = true;
+
+        // 1. 引き量の計算
+        float distance = Vector3.Distance(_holdingHand.position, _pullingHand.position);
+        float pullProgress = Mathf.Clamp01(distance / maxPullDistance);
+
+        // 2. アニメーション適用
+        bowAnimator.Play(_animStateHash, 0, pullProgress);
+        bowAnimator.speed = 0; // アニメーションを停止してフレーム固定
+
+        // 3. 矢の追従処理
+        if (_currentArrow != null)
+        {
+            UpdateArrowTransform(pullProgress);
+        }
+    }
+
+    private void UpdateArrowTransform(float pullProgress)
+    {
+        // 位置合わせ
+        _currentArrow.transform.position = nockPoint.position;
+
+        // 向き合わせ
+        // 【修正】arrowRestPoint ではなく、左右判定済みの _activeRestPoint を使う
+        Vector3 targetPos = (_activeRestPoint != null) ? _activeRestPoint.position : transform.position;
+        
+        Vector3 direction = targetPos - nockPoint.position;
+
+        if (direction.sqrMagnitude > 0.001f)
+        {
+            _currentArrow.transform.rotation = Quaternion.LookRotation(direction) * Quaternion.Euler(arrowRotationOffset);
+        }
+    }
+
+    private void ResetBowString()
+    {
+        _isPulled = false;
+        bowAnimator.Play(_animStateHash, 0, 0f);
+    }
+
+    // ---------------------------------------------------------
+    // XR Interaction Toolkit Events
+    // ---------------------------------------------------------
+
+    // ■ 変更箇所：つかんだ時に「どっちの手か」を判定する
+    public void OnBowGrabbed(SelectEnterEventArgs args)
+    {
+        _holdingHand = args.interactorObject.transform;
+        
+        // --- デバッグログ追加 ---
+        //Debug.Log($"掴んだオブジェクト名: {_holdingHand.name}");
+        //Debug.Log($"掴んだオブジェクトのタグ: {_holdingHand.tag}");
+        // -----------------------
+
+        // 手のタグで判定
+        if (_holdingHand.CompareTag("LeftHand"))
+        {
+            //Debug.Log("判定: 左手 (LeftHand) -> 右利き用レストを使用");
+            _activeRestPoint = restPointForLeftHandHolder;
+        }
+        else if (_holdingHand.CompareTag("RightHand"))
+        {
+            //Debug.Log("判定: 右手 (RightHand) -> 左利き用レストを使用");
+            _activeRestPoint = restPointForRightHandHolder;
         }
         else
         {
-            // 引っ張っていない時は弦を戻す
-            bowAnimator.Play(stateHash, 0, 0f);
+            //Debug.LogWarning("判定不能: タグが一致しません。デフォルト(左手用)を使用します。");
+            // タグ設定がない場合のフォールバック
+            _activeRestPoint = restPointForLeftHandHolder;
         }
     }
-
-private void UpdateBowPull()
-    {
-        float dist = Vector3.Distance(holdingHand.position, pullingHand.position);
-        float pullValue = Mathf.Clamp01(dist / maxPullDistance);
-        bowAnimator.Play(stateHash, 0, pullValue);
-        bowAnimator.speed = 0; 
-
-        // 矢がある場合のみ、矢の位置と回転を制御
-        if(currentArrow != null)
-        {
-            currentArrow.transform.position = nockPoint.position;
-
-            Vector3 targetPosition = arrowRestPoint != null ? arrowRestPoint.position : transform.position;
-            Vector3 direction = targetPosition - nockPoint.position;
-
-            if (direction.sqrMagnitude > 0.001f)
-            {
-                // 【変更】LookRotationで向きを合わせた後、X軸に90度回転を加えて「寝かせる」
-                // ※もしこれでも向きがおかしい場合は 90 を -90 に変えてみてください
-                currentArrow.transform.rotation = Quaternion.LookRotation(direction) * Quaternion.Euler(90, 0, 0);
-            }
-        }
-    }
-    // ---------------------------------------------------------
-    // XR Events
-    // ---------------------------------------------------------
-
-    public void OnBowGrabbed(SelectEnterEventArgs args)
-    {
-        holdingHand = args.interactorObject.transform;
-    }
-
-    public void OnBowReleased(SelectExitEventArgs args)
-    {
-        holdingHand = null;
-    }
+    public void OnBowReleased(SelectExitEventArgs args) => _holdingHand = null;
 
     public void OnStringPulled(SelectEnterEventArgs args)
     {
-        pullingHand = args.interactorObject.transform;
+        _pullingHand = args.interactorObject.transform;
 
-        // 手に矢を持っていればセットする処理（ここはそのまま）
-        ArrowHandManager handManager = args.interactorObject.transform.GetComponentInParent<ArrowHandManager>();
-
-        if (handManager != null && handManager.HasArrow)
+        // 弦を引いた手に矢があるか確認
+        // GetComponentInParent は負荷が高いので、可能ならInteractor自体にコンポーネントを持たせる設計が望ましい
+        var handManager = args.interactorObject.transform.GetComponentInParent<ArrowHandManager>();
+        
+        if (handManager != null && handManager.TryGetArrow(out GameObject arrowObj))
         {
-            GameObject arrowFromHand = handManager.GiveArrow();
-            NockArrow(arrowFromHand);
+            if (arrowObj.TryGetComponent<ArrowController>(out var arrowCtrl))
+            {
+                NockArrow(arrowCtrl);
+            }
         }
     }
 
     public void OnStringReleased(SelectExitEventArgs args)
     {
-        Fire();
-        pullingHand = null;
-        
-        // 離した瞬間にアニメーションをリセット（バネのように戻る表現）
-        bowAnimator.Play(stateHash, 0, 0f);
+        FireArrow();
+        _pullingHand = null;
+        ResetBowString();
     }
 
     // ---------------------------------------------------------
-    // 矢のロジック
+    // 内部ロジック
     // ---------------------------------------------------------
 
-    public void NockArrow(GameObject arrow)
+    private void NockArrow(ArrowController arrow)
     {
-        if (isNocked) return;
+        if (_currentArrow != null) return; // 既に装填済み
 
-        currentArrow = arrow;
-        isNocked = true;
+        _currentArrow = arrow;
+        _currentArrow.transform.SetParent(nockPoint);
+        _currentArrow.transform.localPosition = Vector3.zero;
+        _currentArrow.transform.localRotation = Quaternion.identity;
 
-        Rigidbody rb = currentArrow.GetComponent<Rigidbody>();
-        if (rb) rb.isKinematic = true;
-
-        Collider col = currentArrow.GetComponent<Collider>();
-        if (col) col.enabled = false;
-
-        currentArrow.transform.SetParent(nockPoint);
-        currentArrow.transform.localPosition = Vector3.zero;
-        currentArrow.transform.localRotation = Quaternion.identity;
+        // 矢の状態を更新
+        _currentArrow.OnNock();
     }
 
-// (前略...Fireメソッドのみ抜粋して修正)
-
-    private void Fire()
+    private void FireArrow()
     {
-        // 矢がない、またはセットされていないなら終了（空撃ち防止）
-        if (!isNocked || currentArrow == null) return;
-        currentArrow.transform.SetParent(null);
-        currentArrow.transform.localScale = Vector3.one;
-        Rigidbody rb = currentArrow.GetComponent<Rigidbody>();
-        
-        // ★ここで ArrowController を取得しておく
-        ArrowController arrowCtrl = currentArrow.GetComponent<ArrowController>();
-        Collider[] arrowCols = currentArrow.GetComponentsInChildren<Collider>();
+        if (_currentArrow == null) return;
 
-        if (rb)
+        // 1. 親子関係解除
+        _currentArrow.transform.SetParent(null);
+        
+        // 2. 威力の計算
+        float currentDist = Vector3.Distance(_holdingHand.position, nockPoint.position); // nockPointとの距離で計算したほうが正確
+        float powerMultiplier = Mathf.Clamp01(currentDist / maxPullDistance);
+        Vector3 launchVelocity = nockPoint.forward * (shotPower * powerMultiplier);
+
+        // 3. 衝突無視の設定（発射時の自爆防止）
+        IgnoreCollisionsForArrow(_currentArrow);
+
+        // 4. 発射
+        _currentArrow.Launch(launchVelocity);
+
+        // 5. 参照解除
+        _currentArrow = null;
+    }
+
+    private void IgnoreCollisionsForArrow(ArrowController arrow)
+    {
+        Collider[] arrowCols = arrow.GetComponentsInChildren<Collider>();
+        
+        // 弓本体との衝突無視
+        foreach (var arrowCol in arrowCols)
         {
-            rb.isKinematic = false;
-            // コライダーを有効化する前に...
-            foreach(var arrowCol in arrowCols)
+            foreach (var bowCol in bowColliders)
             {
-                arrowCol.enabled = true;
-
-                // ★追加: 弓のコライダーとの衝突を無視させる
-                if (bowColliders != null)
-                {
-                    foreach (var bowCol in bowColliders)
-                    {
-                        Physics.IgnoreCollision(arrowCol, bowCol, true);
-                    }
-                }
-                
-                // ★追加: もし持ち手(holdingHand)にコライダーがあればそれも無視させる
-                if (holdingHand != null)
-                {
-                    Collider handCol = holdingHand.GetComponent<Collider>();
-                    if (handCol != null)
-                    {
-                        Physics.IgnoreCollision(arrowCol, handCol, true);
-                    }
-                }
+                Physics.IgnoreCollision(arrowCol, bowCol, true);
             }
-            Collider col = currentArrow.GetComponent<Collider>();
-            if (col) col.enabled = true;
-
-            // 威力の計算
-            float currentDist = 0f;
-            if (holdingHand != null)
-            {
-                currentDist = Vector3.Distance(holdingHand.position, transform.position);
-            }
-            float powerMultiplier = Mathf.Clamp01(currentDist / maxPullDistance);
             
-            // 物理的な力を加える
-            rb.AddForce(nockPoint.forward * (shotPower * powerMultiplier), ForceMode.Impulse);
-
-            // 【追加】矢に対して「発射されたよ！」と伝える
-            // これにより、落下や手放しでは刺さらず、この瞬間だけ「刺さるモード」になる
-            if (arrowCtrl != null)
+            // 手との衝突無視（もし必要なら）
+            if (_holdingHand != null && _holdingHand.TryGetComponent<Collider>(out var handCol))
             {
-                arrowCtrl.Launch();
+                Physics.IgnoreCollision(arrowCol, handCol, true);
             }
         }
-
-        currentArrow = null;
-        isNocked = false;
     }
 }

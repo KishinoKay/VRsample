@@ -4,126 +4,114 @@ using UnityEngine.InputSystem;
 public class ArrowHandManager : MonoBehaviour
 {
     [Header("設定")]
-    [Tooltip("矢を持つ位置")]
-    public Transform arrowHolderPoint;
-    [Tooltip("矢を拾える範囲(半径)")]
-    public float pickupRadius = 0.15f;
-    [Tooltip("矢を判定するためのレイヤー（指定なければAllでOK）")]
-    public LayerMask arrowLayer = ~0; // デフォルトは全て
+    [SerializeField] private Transform arrowHolderPoint;
+    [SerializeField] private float pickupRadius = 0.15f;
+    [SerializeField] private LayerMask arrowLayer = ~0; // デフォルトAll
+    [SerializeField] private InputActionProperty toggleArrowAction;
 
-    [Header("入力設定")]
-    public InputActionProperty toggleArrowAction;
+    // 現在持っている矢
+    private GameObject _currentHeldArrow;
+    public bool HasArrow => _currentHeldArrow != null;
 
-    // 内部状態
-    private GameObject currentHeldArrow;
-    public bool HasArrow => currentHeldArrow != null;
-
-    void OnEnable()
+    private void OnEnable()
     {
+        toggleArrowAction.action?.Enable();
         if (toggleArrowAction.action != null)
-            toggleArrowAction.action.Enable(); 
-
-        toggleArrowAction.action.performed += OnToggleArrow;
+        {
+            toggleArrowAction.action.performed += OnToggleInput;
+        }
     }
 
-    void OnDisable()
+    private void OnDisable()
     {
-        toggleArrowAction.action.performed -= OnToggleArrow;
-        
         if (toggleArrowAction.action != null)
-            toggleArrowAction.action.Disable();
+        {
+            toggleArrowAction.action.performed -= OnToggleInput;
+        }
+        toggleArrowAction.action?.Disable();
     }
 
-    // トリガーボタン処理
-    private void OnToggleArrow(InputAction.CallbackContext context)
+    private void OnToggleInput(InputAction.CallbackContext context)
     {
-        Debug.Log("ボタンが押されました！");
         if (HasArrow)
         {
-            // 持っていれば落とす
             DropArrow();
         }
         else
         {
-            // 持っていなければ近くの矢を探して拾う
             TryPickupArrow();
         }
     }
 
-    // 周辺の矢を探して拾う処理
     private void TryPickupArrow()
     {
-        // 手の周辺にあるコライダーを検出
+        // 範囲内のコライダーを取得 (NonAlloc版を使うとさらにメモリ効率が良いが、今回は簡易版)
         Collider[] hits = Physics.OverlapSphere(transform.position, pickupRadius, arrowLayer);
-        Debug.Log($"周辺のコライダー検知数: {hits.Length}"); // ← 0なら範囲外かレイヤー違い
 
         foreach (var hit in hits)
         {
-            Debug.Log($"検知したオブジェクト: {hit.name}, タグ: {hit.tag}"); // ← タグが "Arrow" か確認
-            // "Arrow" タグがついている、かつ Rigidbody を持っているものを探す
-            if (hit.CompareTag("Arrow"))
+            // ArrowControllerを持っているか確認（タグ文字列比較より安全）
+            // attachedRigidbodyを経由することで、コライダーが子にあっても親のスクリプトを取れる
+            if (hit.attachedRigidbody != null && 
+                hit.attachedRigidbody.TryGetComponent<ArrowController>(out var arrowCtrl))
             {
-                // 親（＝矢のルートオブジェクト）を取得
-                // ※コライダーが子にある場合などを考慮して attachedRigidbody から探すのが確実
-                Rigidbody targetRb = hit.attachedRigidbody;
-                
-                if (targetRb != null)
+                // まだ誰にも持たれていない（Idle状態）矢のみ拾えるなどの条件を追加可能
+                if(arrowCtrl.CurrentState == ArrowController.ArrowState.Idle || 
+                   arrowCtrl.CurrentState == ArrowController.ArrowState.Stuck)
                 {
-                    EquipArrow(targetRb.gameObject);
-                    break; // 1つ拾ったら終了
+                    EquipArrow(arrowCtrl.gameObject);
+                    break;
                 }
             }
         }
     }
 
-    // 指定された矢を装備する処理
     private void EquipArrow(GameObject arrowObj)
     {
-        currentHeldArrow = arrowObj;
+        _currentHeldArrow = arrowObj;
+        
+        // 物理無効化
+        if(_currentHeldArrow.TryGetComponent<ArrowController>(out var arrowCtrl))
+        {
+            arrowCtrl.SetPhysicsEnabled(false);
+        }
 
-        // 物理演算無効化 & 親子関係設定
-        Rigidbody rb = currentHeldArrow.GetComponent<Rigidbody>();
-        if (rb) rb.isKinematic = true;
-
-        // 手のホールド位置に移動
-        currentHeldArrow.transform.SetParent(arrowHolderPoint);
-        currentHeldArrow.transform.localPosition = Vector3.zero;
-        currentHeldArrow.transform.localRotation = Quaternion.identity;
-
-        // 持っている間はコライダーを無効化（弓や体に当たらないように）
-        // 矢に複数のコライダーがある場合を考慮して配列で処理
-        Collider[] cols = currentHeldArrow.GetComponentsInChildren<Collider>();
-        foreach (var c in cols) c.enabled = false;
+        // 位置合わせ
+        _currentHeldArrow.transform.SetParent(arrowHolderPoint);
+        _currentHeldArrow.transform.localPosition = Vector3.zero;
+        _currentHeldArrow.transform.localRotation = Quaternion.identity;
     }
 
-    // 矢を落とす
     public void DropArrow()
     {
         if (!HasArrow) return;
 
-        currentHeldArrow.transform.SetParent(null);
+        _currentHeldArrow.transform.SetParent(null);
 
-        Rigidbody rb = currentHeldArrow.GetComponent<Rigidbody>();
-        if (rb) rb.isKinematic = false;
+        // 物理有効化
+        if(_currentHeldArrow.TryGetComponent<ArrowController>(out var arrowCtrl))
+        {
+            arrowCtrl.SetPhysicsEnabled(true);
+            // 手放した直後はIdle状態にする
+            // arrowCtrl.Launch(Vector3.zero); // 必要ならここで軽く投げる処理も可能
+        }
 
-        Collider[] cols = currentHeldArrow.GetComponentsInChildren<Collider>();
-        foreach (var c in cols) c.enabled = true;
-
-        currentHeldArrow = null;
+        _currentHeldArrow = null;
     }
 
-    // 弓に矢を渡す用（BowControllerから呼ばれる）
-    public GameObject GiveArrow()
+    /// <summary>
+    /// 弓に矢を渡すためのメソッド（成功したらtrueを返し、outで矢を渡す）
+    /// </summary>
+    public bool TryGetArrow(out GameObject arrow)
     {
-        if (!HasArrow) return null;
+        arrow = null;
+        if (!HasArrow) return false;
 
-        GameObject arrowToGive = currentHeldArrow;
-        currentHeldArrow = null; // 管理から外す
-        
-        return arrowToGive;
+        arrow = _currentHeldArrow;
+        _currentHeldArrow = null; // 所有権を放棄
+        return true;
     }
 
-    // デバッグ用：エディタ上で拾える範囲を表示
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;
