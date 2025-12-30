@@ -51,5 +51,5 @@
         "temp/": true,
         "Temp/": true
     },
-    "dotnet.defaultSolution": "VR-MQ3-sample.sln"
+    "dotnet.defaultSolution": "VRsample.sln"
 }

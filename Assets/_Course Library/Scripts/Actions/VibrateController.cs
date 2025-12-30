@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿#pragma warning disable 0618 // ← 1行目に追加：この警告番号（0618）を無視する
+using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 
 /// <summary>
@@ -32,3 +33,4 @@ public class VibrateController : MonoBehaviour
         controller.SendHapticImpulse(strongVibrate, duration);
     }
 }
+#pragma warning restore 0618 // ← ファイルの最後に追加：無視設定を解除する

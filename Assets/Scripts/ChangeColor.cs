@@ -4,25 +4,25 @@ using UnityEngine;
 
 public class ChangeColor : MonoBehaviour
 {
-    Renderer renderer;
+    Renderer _renderer;
     private Material originalMaterial;
     public Material transparent;
     // Start is called before the first frame update
     void Start()
     {
-        renderer = GetComponent<Renderer>();
-        originalMaterial = renderer.material;
+        _renderer = GetComponent<Renderer>();
+        originalMaterial = _renderer.material;
     }
 
     public void ChangeTransparent()
     {
-        renderer.material = transparent;
+        _renderer.material = transparent;
         UnityEngine.Debug.Log("ChangedTransparent!");
     }
 
     public void ChangeOriginalColor()
     {
-        renderer.material = originalMaterial;
+        _renderer.material = originalMaterial;
         UnityEngine.Debug.Log("ChangedOriginalColor!");
     }
     bool isOriginal = true;
