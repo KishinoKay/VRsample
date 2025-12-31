@@ -75,6 +75,25 @@ public class ArrowController : MonoBehaviour
         if (collision.gameObject.CompareTag("Player") || collision.gameObject.CompareTag("Arrow")) return;
 
         StickArrow(collision);
+        // 当たった相手（またはその親）が的のスクリプトを持っているか確認
+        TargetBoard target = collision.gameObject.GetComponentInParent<TargetBoard>();
+
+        if (target != null)
+        {
+            // 正確な着弾点を取得
+            Vector3 hitPoint = collision.contacts[0].point;
+
+            // 的に計算をお願いする
+            int score = target.CalculateScore(hitPoint);
+
+            // マネージャーに点数を送る
+            if (ScoreManager.instance != null)
+            {
+                ScoreManager.instance.AddScore(score);
+            }
+
+            Debug.Log($"Hit! Score: {score}");
+        }
     }
 
     private void StickArrow(Collision collision)
