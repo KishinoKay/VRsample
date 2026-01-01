@@ -318,15 +318,6 @@
       },
       "url": "https://packages.unity.com"
     },
-    "com.unity.xr.mock-hmd": {
-      "version": "1.5.0-exp.2",
-      "depth": 0,
-      "source": "registry",
-      "dependencies": {
-        "com.unity.xr.management": "4.5.3"
-      },
-      "url": "https://packages.unity.com"
-    },
     "com.unity.xr.oculus": {
       "version": "4.5.1",
       "depth": 1,

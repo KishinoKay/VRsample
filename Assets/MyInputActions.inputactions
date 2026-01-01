@@ -15,18 +15,18 @@
                     "initialStateCheck": false
                 },
                 {
-                    "name": "SwitchCamera",
+                    "name": "LeftGrab",
                     "type": "Button",
-                    "id": "e2892678-2b59-44b0-a736-0aa92d777cfe",
+                    "id": "45f149c2-ca89-4912-9b18-8e50d85cd4df",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
                     "initialStateCheck": false
                 },
                 {
-                    "name": "LeftGrab",
+                    "name": "arrow",
                     "type": "Button",
-                    "id": "45f149c2-ca89-4912-9b18-8e50d85cd4df",
+                    "id": "b7654aba-7f7c-4b70-bca0-f47fb0fc294d",
                     "expectedControlType": "",
                     "processors": "",
                     "interactions": "",
@@ -47,23 +47,23 @@
                 },
                 {
                     "name": "",
-                    "id": "27015117-4efa-413c-985e-43a229a18387",
-                    "path": "<XRController>{RightHand}/{PrimaryButton}",
-                    "interactions": "",
-                    "processors": "",
-                    "groups": "",
-                    "action": "SwitchCamera",
-                    "isComposite": false,
-                    "isPartOfComposite": false
-                },
-                {
-                    "name": "",
                     "id": "2e549628-397e-40a1-96ea-0edb33ff4cc7",
                     "path": "<XRController>{LeftHand}/{TriggerButton}",
                     "interactions": "",
                     "processors": "",
                     "groups": "",
                     "action": "LeftGrab",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
+                    "id": "d3fc095f-ef0e-44a3-82d8-86d10111586a",
+                    "path": "<XRController>{RightHand}/{SecondaryButton}",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "arrow",
                     "isComposite": false,
                     "isPartOfComposite": false
                 }

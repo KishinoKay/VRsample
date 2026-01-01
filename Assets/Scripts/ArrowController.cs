@@ -1,129 +1,279 @@
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody), typeof(Collider))]
+
+
+[RequireComponent(typeof(Rigidbody))]
+
 public class ArrowController : MonoBehaviour
+
 {
-    // 矢の状態定義
+
     public enum ArrowState { Idle, Nocked, Flying, Stuck }
 
+
+
     [Header("設定")]
+
     [SerializeField] private float embedDepth = 0.1f;
-    [SerializeField] private float autoDestroyTime = 5f; // 0なら消えない
-    [SerializeField] private Vector3 modelRotationOffset = new Vector3(90, 0, 0); // モデルの向き補正用
+
+    [SerializeField] private float autoDestroyTime = 5f;
+
+    [SerializeField] private Vector3 modelRotationOffset = new Vector3(90, 0, 0);
+
+
+
+    [Header("コライダー設定（必ずアサインしてください）")]
+
+    [SerializeField] private Collider tipCollider;   // ★ 矢じり（刺さる判定用）
+
+    [SerializeField] private Collider shaftCollider; // ★ 持ち手（持つ判定・弾かれる用）
+
+
 
     [Header("参照（自動取得）")]
-    [SerializeField] private Rigidbody rb;
-    [SerializeField] private Collider col;
 
-    // 外部公開プロパティ
+    [SerializeField] private Rigidbody rb;
+
+
+
     public ArrowState CurrentState { get; private set; } = ArrowState.Idle;
 
+
+
     private void Awake()
+
     {
+
         if (!rb) rb = GetComponent<Rigidbody>();
-        if (!col) col = GetComponent<Collider>();
+
+       
+
+        // 設定忘れ防止の警告
+
+        if (tipCollider == null || shaftCollider == null)
+
+        {
+
+            Debug.LogError("ArrowController: TipCollider または ShaftCollider が設定されていません！インスペクターで割り当ててください。");
+
+        }
+
     }
+
+
 
     private void FixedUpdate()
+
     {
-        // 飛行中のみ、進行方向に向きを合わせる
+
         if (CurrentState == ArrowState.Flying && rb.velocity.sqrMagnitude > 0.01f)
+
         {
-            // 速度方向への回転 + モデルごとのオフセット回転
+
             Quaternion lookRotation = Quaternion.LookRotation(rb.velocity);
+
             transform.rotation = lookRotation * Quaternion.Euler(modelRotationOffset);
+
         }
+
     }
 
-    /// <summary>
-    /// 矢を発射するメソッド
-    /// </summary>
+
+
     public void Launch(Vector3 velocity)
+
     {
+
         if (CurrentState == ArrowState.Flying) return;
 
-        transform.SetParent(null); // 親から切り離す（念のため）
-        SetPhysicsEnabled(true);
+
+
+        transform.SetParent(null);
+
+        SetPhysicsEnabled(true); // 発射時は物理オン
+
         rb.isKinematic = false;
-        rb.collisionDetectionMode = CollisionDetectionMode.Continuous; // すり抜け防止推奨
+
+        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
+
         rb.velocity = velocity;
 
+
+
         CurrentState = ArrowState.Flying;
+
     }
+
+
+
+    public void OnNock()
+
+    {
+
+        CurrentState = ArrowState.Nocked;
+
+        SetPhysicsEnabled(false); // つがえている時は物理オフ（持ち手判定は残すなら要調整）
+
+        rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
+
+    }
+
+
 
     /// <summary>
-    /// 弓にセットされた時の処理
+
+    /// 物理挙動のON/OFF切り替え
+
     /// </summary>
-    public void OnNock()
-    {
-        CurrentState = ArrowState.Nocked;
-        SetPhysicsEnabled(false);
-        rb.collisionDetectionMode = CollisionDetectionMode.Discrete; // 負荷軽減
-    }
 
     public void SetPhysicsEnabled(bool isEnabled)
+
     {
+
         rb.isKinematic = !isEnabled;
-        col.enabled = isEnabled;
+
+       
+
+        // 状況に応じてコライダーのオンオフ制御
+
+        if (tipCollider) tipCollider.enabled = isEnabled;
+
+        if (shaftCollider) shaftCollider.enabled = isEnabled;
+
     }
 
+
+
     private void OnCollisionEnter(Collision collision)
+
     {
+
         if (CurrentState != ArrowState.Flying) return;
 
+       
+
         // プレイヤーや他の矢への衝突判定を除外
+
         if (collision.gameObject.CompareTag("Player") || collision.gameObject.CompareTag("Arrow")) return;
 
-        StickArrow(collision);
-        // 当たった相手（またはその親）が的のスクリプトを持っているか確認
+
+
+        // ★重要：衝突情報の詳細を取得
+
+        // GetContact(0)で最初の接触点を取得し、thisColliderで「自分のどのコライダーが当たったか」を確認
+
+        ContactPoint contact = collision.GetContact(0);
+
+        Collider myCollider = contact.thisCollider;
+
+
+
+        // ★判定：矢じりのコライダーが当たった場合のみ「刺さる」処理をする
+
+        if (myCollider == tipCollider)
+
+        {
+
+            StickArrow(collision, contact.point);
+
+            ProcessScore(collision, contact.point);
+
+        }
+
+        else
+
+        {
+
+            // シャフト（持ち手）が当たった場合は、刺さらずにそのまま物理演算で弾かれる（何もしなくて良い）
+
+            // 必要ならここに「カラン」という音を鳴らす処理などを追加
+
+            Debug.Log("シャフトが当たりました（刺さりません）");
+
+        }
+
+    }
+
+
+
+    private void ProcessScore(Collision collision, Vector3 hitPoint)
+
+    {
+
         TargetBoard target = collision.gameObject.GetComponentInParent<TargetBoard>();
 
         if (target != null)
-        {
-            // 正確な着弾点を取得
-            Vector3 hitPoint = collision.contacts[0].point;
 
-            // 的に計算をお願いする
+        {
+
             int score = target.CalculateScore(hitPoint);
 
-            // マネージャーに点数を送る
             if (ScoreManager.instance != null)
+
             {
+
                 ScoreManager.instance.AddScore(score);
+
             }
 
             Debug.Log($"Hit! Score: {score}");
+
         }
+
     }
 
-    private void StickArrow(Collision collision)
+
+
+    private void StickArrow(Collision collision, Vector3 hitPoint)
+
     {
-        // ★重要修正：停止させる前に、飛んできた方向（進行方向）を保存しておく
-        // transform.forward は rotationOffset の影響で進行方向じゃない可能性があるため使わない
+
         Vector3 stickDirection = rb.velocity.normalized;
 
-        // もし速度がほぼゼロ（ありえないが念のため）なら、衝突地点へのベクトルを使うなどの保険
         if (stickDirection.sqrMagnitude < 0.001f) stickDirection = transform.forward;
+
+
 
         CurrentState = ArrowState.Stuck;
 
-        // 物理演算停止
+
+
+        // 物理停止
+
         rb.velocity = Vector3.zero;
+
         rb.angularVelocity = Vector3.zero;
+
         rb.isKinematic = true;
+
         rb.collisionDetectionMode = CollisionDetectionMode.Discrete;
 
-        // 親オブジェクト追従設定
+
+
+        // 刺さった後はコライダーを無効化（あるいはTrigger化）して、邪魔にならないようにする
+
+        // ※ 持つためにシャフトのコライダーだけ残したい場合は shaftCollider.enabled = true にする
+
+        tipCollider.enabled = false;
+
+        shaftCollider.enabled = true; // 刺さった後も抜くために持つならON
+
+
+
         transform.SetParent(collision.transform);
-        
-        // ★修正：保存しておいた「進行方向」に向かってめり込ませる
+
         transform.position += stickDirection * embedDepth;
 
-        // オプション：刺さったら少し揺らす演出などをここに入れると気持ちいいです
+
 
         if (autoDestroyTime > 0f)
+
         {
+
             Destroy(gameObject, autoDestroyTime);
+
         }
+
     }
+
 }

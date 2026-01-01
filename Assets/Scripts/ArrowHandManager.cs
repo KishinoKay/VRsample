@@ -6,8 +6,14 @@ public class ArrowHandManager : MonoBehaviour
     [Header("設定")]
     [SerializeField] private Transform arrowHolderPoint;
     [SerializeField] private float pickupRadius = 0.15f;
-    [SerializeField] private LayerMask arrowLayer = ~0; // デフォルトAll
-    [SerializeField] private InputActionProperty toggleArrowAction;
+    [SerializeField] private LayerMask arrowLayer = ~0;
+
+    [Header("入力設定")]
+    [SerializeField] private InputActionProperty grabAction;  // ★ 既存の矢を掴む・離す（例: Grip）
+    [SerializeField] private InputActionProperty spawnAction; // ★ 新しい矢を生成する（例: Trigger / PrimaryButton）
+
+    [Header("生成設定")]
+    [SerializeField] private GameObject arrowPrefab;
 
     // 現在持っている矢
     private GameObject _currentHeldArrow;
@@ -15,52 +21,84 @@ public class ArrowHandManager : MonoBehaviour
 
     private void OnEnable()
     {
-        toggleArrowAction.action?.Enable();
-        if (toggleArrowAction.action != null)
+        // --- Grab Action (掴む/離す) の登録 ---
+        grabAction.action?.Enable();
+        if (grabAction.action != null)
         {
-            toggleArrowAction.action.performed += OnToggleInput;
+            grabAction.action.performed += OnGrabInput;
+        }
+
+        // --- Spawn Action (生成) の登録 ---
+        spawnAction.action?.Enable();
+        if (spawnAction.action != null)
+        {
+            spawnAction.action.performed += OnSpawnInput;
         }
     }
 
     private void OnDisable()
     {
-        if (toggleArrowAction.action != null)
-        {
-            toggleArrowAction.action.performed -= OnToggleInput;
-        }
-        toggleArrowAction.action?.Disable();
+        if (grabAction.action != null) grabAction.action.performed -= OnGrabInput;
+        grabAction.action?.Disable();
+
+        if (spawnAction.action != null) spawnAction.action.performed -= OnSpawnInput;
+        spawnAction.action?.Disable();
     }
 
-    private void OnToggleInput(InputAction.CallbackContext context)
+    // ★ 掴む・離すボタンが押された時の処理
+    private void OnGrabInput(InputAction.CallbackContext context)
     {
         if (HasArrow)
         {
+            // 既に持っているなら -> 離す
             DropArrow();
         }
         else
         {
+            // 持っていないなら -> 近くの矢を拾おうとする（生成はしない）
             TryPickupArrow();
         }
     }
 
+    // ★ 生成ボタンが押された時の処理
+    private void OnSpawnInput(InputAction.CallbackContext context)
+    {
+        // 既に矢を持っていたら何もしない（二重持ち防止）
+        if (HasArrow) return;
+
+        // 持っていなければ生成
+        SpawnArrow();
+    }
+
+    public void SpawnArrow()
+    {
+        if (arrowPrefab == null)
+        {
+            Debug.LogWarning("ArrowHandManager: Arrow Prefabが設定されていません");
+            return;
+        }
+
+        GameObject newArrow = Instantiate(arrowPrefab, arrowHolderPoint.position, arrowHolderPoint.rotation);
+        EquipArrow(newArrow);
+    }
+
+    /// <summary>
+    /// 近くの矢を探して装備する（生成機能は削除）
+    /// </summary>
     private void TryPickupArrow()
     {
-        // 範囲内のコライダーを取得 (NonAlloc版を使うとさらにメモリ効率が良いが、今回は簡易版)
         Collider[] hits = Physics.OverlapSphere(transform.position, pickupRadius, arrowLayer);
 
         foreach (var hit in hits)
         {
-            // ArrowControllerを持っているか確認（タグ文字列比較より安全）
-            // attachedRigidbodyを経由することで、コライダーが子にあっても親のスクリプトを取れる
             if (hit.attachedRigidbody != null && 
                 hit.attachedRigidbody.TryGetComponent<ArrowController>(out var arrowCtrl))
             {
-                // まだ誰にも持たれていない（Idle状態）矢のみ拾えるなどの条件を追加可能
                 if(arrowCtrl.CurrentState == ArrowController.ArrowState.Idle || 
                    arrowCtrl.CurrentState == ArrowController.ArrowState.Stuck)
                 {
                     EquipArrow(arrowCtrl.gameObject);
-                    break;
+                    return; // 1つ拾ったら終了
                 }
             }
         }
@@ -70,13 +108,13 @@ public class ArrowHandManager : MonoBehaviour
     {
         _currentHeldArrow = arrowObj;
         
-        // 物理無効化
         if(_currentHeldArrow.TryGetComponent<ArrowController>(out var arrowCtrl))
         {
             arrowCtrl.SetPhysicsEnabled(false);
+            // Stuck状態のものを拾った場合などのためにIdleに戻す
+            // arrowCtrl.OnNock(); // 必要ならここでステート変更メソッドを呼ぶなど
         }
 
-        // 位置合わせ
         _currentHeldArrow.transform.SetParent(arrowHolderPoint);
         _currentHeldArrow.transform.localPosition = Vector3.zero;
         _currentHeldArrow.transform.localRotation = Quaternion.identity;
@@ -88,27 +126,21 @@ public class ArrowHandManager : MonoBehaviour
 
         _currentHeldArrow.transform.SetParent(null);
 
-        // 物理有効化
         if(_currentHeldArrow.TryGetComponent<ArrowController>(out var arrowCtrl))
         {
             arrowCtrl.SetPhysicsEnabled(true);
-            // 手放した直後はIdle状態にする
-            // arrowCtrl.Launch(Vector3.zero); // 必要ならここで軽く投げる処理も可能
         }
 
         _currentHeldArrow = null;
     }
 
-    /// <summary>
-    /// 弓に矢を渡すためのメソッド（成功したらtrueを返し、outで矢を渡す）
-    /// </summary>
     public bool TryGetArrow(out GameObject arrow)
     {
         arrow = null;
         if (!HasArrow) return false;
 
         arrow = _currentHeldArrow;
-        _currentHeldArrow = null; // 所有権を放棄
+        _currentHeldArrow = null;
         return true;
     }
 
