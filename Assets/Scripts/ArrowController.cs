@@ -174,6 +174,16 @@ public class ArrowController : MonoBehaviour
 
         {
 
+            // 当たった相手（またはその親）から SimpleEnemyAI スクリプトを探す
+            var enemy = collision.gameObject.GetComponentInParent<SimpleEnemyAI>();
+
+            // もし敵だったらダメージを与える
+            if (enemy != null)
+            {
+                // ダメージ量はここで決める（例: 50ダメージ）
+                enemy.TakeDamage(50f); 
+                Debug.Log("敵に命中しました！");
+            }
             StickArrow(collision, contact.point);
 
             ProcessScore(collision, contact.point);
