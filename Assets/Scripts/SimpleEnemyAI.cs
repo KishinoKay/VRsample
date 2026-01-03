@@ -1,107 +1,164 @@
 using UnityEngine;
-using UnityEngine.AI; // NavMeshを使うために必要
+using UnityEngine.AI;
 
-// 自動で必要なコンポーネントを追加
 [RequireComponent(typeof(NavMeshAgent))]
 [RequireComponent(typeof(Animator))]
+[RequireComponent(typeof(AudioSource))] // ★追加: 足音用のスピーカーを必須にする
 public class SimpleEnemyAI : MonoBehaviour
 {
     [Header("基本設定")]
-    [SerializeField] private string targetTag = "Player"; // 追いかける相手のタグ
-    [SerializeField] private float maxHP = 100f;          // 体力
-    [SerializeField] private float stopDistance = 1.5f;   // 攻撃のために止まる距離
-    [SerializeField] private float detectionRange = 10.0f; // プレイヤーを検知する範囲
+    [SerializeField] private string targetTag = "Player";
+    [SerializeField] private float maxHP = 100f;
+    [SerializeField] private float stopDistance = 1.5f;
+    [SerializeField] private float detectionRange = 10.0f;
+
+    [Header("オーディオ設定")]
+    [SerializeField] private string groanSE = "Zombie_Groan";
+    [SerializeField] private float groanInterval = 5.0f;
+    [SerializeField] private string footstepSE = "Footstep_Dirt";
+    [SerializeField] private float footstepInterval = 0.5f;
+    [SerializeField] private string deathSE = "Zombie_Death";
+
     private NavMeshAgent agent;
     private Animator animator;
     private Transform target;
+    
+    // ★追加: 足音専用のAudioSource
+    private AudioSource footstepSource;
+
     private float currentHP;
     private bool isDead = false;
+    private float groanTimer;
+    private float footstepTimer;
 
     void Start()
     {
         agent = GetComponent<NavMeshAgent>();
         animator = GetComponent<Animator>();
-        currentHP = maxHP;
+        
+        // ★追加: AudioSourceコンポーネントを取得し、3D設定を行う
+        footstepSource = GetComponent<AudioSource>();
+        footstepSource.spatialBlend = 1.0f; // 完全3Dサウンドにする
 
-        // 追いかける対象（VRプレイヤー）を探す
+        currentHP = maxHP;
+        groanTimer = 0f;
+        footstepTimer = 0f;
+
         GameObject playerObj = GameObject.FindGameObjectWithTag(targetTag);
         if (playerObj != null)
         {
             target = playerObj.transform;
         }
-        else
-        {
-            Debug.LogWarning("ターゲットが見つかりません！VRカメラに 'Player' タグをつけてください。");
-        }
     }
 
     void Update()
     {
-        if (isDead || target == null) return;
+        if (isDead) return;
 
-        // プレイヤーまでの距離を測る
+        // --- うめき声 (変更なし) ---
+        groanTimer += Time.deltaTime;
+        if (groanTimer >= groanInterval)
+        {
+            if (!string.IsNullOrEmpty(groanSE))
+                AudioManager.Instance.PlaySE(groanSE, transform.position);
+            groanTimer = 0f;
+        }
+
+        // --- ターゲット追尾 & 足音制御 ---
+        if (target == null) return;
+
         float distance = Vector3.Distance(transform.position, target.position);
 
-        // ★変更点：感知範囲に入っているかチェック
+        // 追跡範囲内
         if (distance <= detectionRange)
         {
-            // --- 範囲内なら追いかける ---
-            agent.isStopped = false;
-            agent.SetDestination(target.position);
-
-            // アニメーション：動く速度を入れる
-            animator.SetFloat("Speed", agent.velocity.magnitude);
-            
-            // 攻撃範囲（近すぎたら止まる）
-            if (distance <= stopDistance)
+            // 攻撃範囲よりは遠い (移動中)
+            if (distance > stopDistance)
             {
-                agent.isStopped = true;
-                // ここで攻撃アニメーションなど
+                agent.isStopped = false;
+                agent.SetDestination(target.position);
+                animator.SetFloat("Speed", agent.velocity.magnitude);
+
+                // ★修正: 移動中の足音再生
+                if (agent.velocity.magnitude > 0.1f)
+                {
+                    footstepTimer += Time.deltaTime;
+                    if (footstepTimer >= footstepInterval)
+                    {
+                        if (!string.IsNullOrEmpty(footstepSE))
+                        {
+                            // ★変更: 自分のAudioSourceを使って再生 (これでStopできるようになる)
+                            AudioManager.Instance.PlaySE(footstepSource, footstepSE);
+                        }
+                        footstepTimer = 0f;
+                    }
+                }
+                else
+                {
+                    // 移動速度がほぼ0なら、念のため音を止める
+                    // (壁に引っかかっている時などに足音が鳴り続けるのを防ぐ)
+                    footstepSource.Stop();
+                    footstepTimer = 0f; // 次動き出すときに即座に鳴らすなら0でOK
+                }
+            }
+            // 攻撃範囲に到達 (待機/攻撃)
+            else
+            {
+                StopMoving(); // ★処理を分離して呼び出し
             }
         }
+        // 追跡範囲外 (待機)
         else
         {
-            // --- 範囲外なら待機 ---
-            agent.isStopped = true;
-            animator.SetFloat("Speed", 0f); // 止まるアニメーション
+            StopMoving(); // ★処理を分離して呼び出し
         }
     }
-    // ★重要：矢から呼ばれるダメージ処理関数
+
+    // ★追加: 停止時の共通処理
+    private void StopMoving()
+    {
+        agent.isStopped = true;
+        animator.SetFloat("Speed", 0f);
+
+        // ★ここで足音を強制停止！
+        // 「ザッ…」という余韻も消えます
+        if (footstepSource.isPlaying)
+        {
+            footstepSource.Stop();
+        }
+        
+        // タイマーもリセットしておくと、次に動き出す時に変なタイミングで鳴らない
+        footstepTimer = footstepInterval; 
+    }
+
+    // (以下 TakeDamage, Die などは変更なし)
     public void TakeDamage(float damage)
     {
         if (isDead) return;
-
         currentHP -= damage;
-        Debug.Log($"敵がダメージを受けた！ 残りHP: {currentHP}");
-
-        // 死亡判定
-        if (currentHP <= 0)
-        {
-            Die();
-        }
-        else
-        {
-            // ダメージモーションがあればここで再生
-            // animator.SetTrigger("Hit");
-        }
+        if (currentHP <= 0) Die();
     }
 
     private void Die()
     {
         isDead = true;
-        agent.isStopped = true; // 移動停止
-        agent.enabled = false;  // NavMeshAgentをオフ
+        agent.isStopped = true;
+        agent.enabled = false;
         
-        // コライダーを消して、死体に矢が当たらないようにする
+        // ★重要: 死んだ瞬間に足音は完全に止める
+        footstepSource.Stop();
+
         Collider col = GetComponent<Collider>();
         if (col) col.enabled = false;
 
-        // 死亡アニメーション再生
-        animator.SetTrigger("Die"); 
-        
-        // パタッと倒れる物理挙動にしたい場合はRagdollなどを使いますが、
-        // まずは単純に「その場で消える」か「倒れるモーション」でOK
-        Debug.Log("敵を倒した！");
-        Destroy(gameObject, 3.0f); // 3秒後に消滅
+        animator.SetTrigger("Die");
+
+        if (!string.IsNullOrEmpty(deathSE))
+        {
+            // 断末魔は「その場に残る音」として再生（死体と一緒に消えないように）
+            AudioManager.Instance.PlaySE(deathSE, transform.position);
+        }
+
+        Destroy(gameObject, 3.0f);
     }
 }

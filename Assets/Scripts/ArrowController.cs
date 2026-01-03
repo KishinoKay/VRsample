@@ -149,31 +149,19 @@ public class ArrowController : MonoBehaviour
     {
 
         if (CurrentState != ArrowState.Flying) return;
-
-       
-
         // プレイヤーや他の矢への衝突判定を除外
-
         if (collision.gameObject.CompareTag("Player") || collision.gameObject.CompareTag("Arrow")) return;
 
-
-
         // ★重要：衝突情報の詳細を取得
-
         // GetContact(0)で最初の接触点を取得し、thisColliderで「自分のどのコライダーが当たったか」を確認
-
         ContactPoint contact = collision.GetContact(0);
-
         Collider myCollider = contact.thisCollider;
-
-
 
         // ★判定：矢じりのコライダーが当たった場合のみ「刺さる」処理をする
 
         if (myCollider == tipCollider)
-
         {
-
+            AudioManager.Instance.PlaySE("hit", collision.contacts[0].point);
             // 当たった相手（またはその親）から SimpleEnemyAI スクリプトを探す
             var enemy = collision.gameObject.GetComponentInParent<SimpleEnemyAI>();
 
