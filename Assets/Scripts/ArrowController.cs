@@ -46,8 +46,6 @@ public class ArrowController : MonoBehaviour
 
         if (!rb) rb = GetComponent<Rigidbody>();
 
-       
-
         // 設定忘れ防止の警告
 
         if (tipCollider == null || shaftCollider == null)
@@ -226,7 +224,7 @@ public class ArrowController : MonoBehaviour
 
     {
 
-        Vector3 stickDirection = rb.velocity.normalized;
+        Vector3 stickDirection = transform.forward;
 
         if (stickDirection.sqrMagnitude < 0.001f) stickDirection = transform.forward;
 
@@ -258,9 +256,9 @@ public class ArrowController : MonoBehaviour
 
 
 
-        transform.SetParent(collision.transform);
-
         transform.position += stickDirection * embedDepth;
+
+        transform.SetParent(collision.transform, true);
 
 
 

@@ -44,6 +44,13 @@ public class SimpleEnemyAI : MonoBehaviour
         groanTimer = 0f;
         footstepTimer = 0f;
 
+
+        // ★追加: ゲーム開始時に「私はここにいます」とマネージャーに登録
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.RegisterEnemy();
+        }
+
         GameObject playerObj = GameObject.FindGameObjectWithTag(targetTag);
         if (playerObj != null)
         {
@@ -157,6 +164,11 @@ public class SimpleEnemyAI : MonoBehaviour
         {
             // 断末魔は「その場に残る音」として再生（死体と一緒に消えないように）
             AudioManager.Instance.PlaySE(deathSE, transform.position);
+        }
+        // ★追加: 死んだ時に「やられました」とマネージャーに報告
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.ReportEnemyDeath();
         }
 
         Destroy(gameObject, 3.0f);
