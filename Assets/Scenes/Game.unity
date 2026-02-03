@@ -11817,6 +11817,11 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 4941219564456579801, guid: dc067c577ec1b854684d789b6e727cc0, type: 3}
   m_PrefabInstance: {fileID: 692397217}
   m_PrefabAsset: {fileID: 0}
+--- !u!4 &693368401 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 8298045291338814965, guid: 77e7c27b2c5525e4aa8cc9f99d654486, type: 3}
+  m_PrefabInstance: {fileID: 2779669268269126897}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &694680993
 GameObject:
   m_ObjectHideFlags: 0
@@ -18524,6 +18529,7 @@ GameObject:
   - component: {fileID: 1136487571}
   - component: {fileID: 1136487570}
   - component: {fileID: 1136487572}
+  - component: {fileID: 1136487573}
   m_Layer: 0
   m_Name: GameManager
   m_TagString: Untagged
@@ -18579,6 +18585,32 @@ MonoBehaviour:
   heightRange: 20
   minInterval: 0.01
   maxInterval: 0.5
+--- !u!114 &1136487573
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1136487569}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b34304d8c1ff8db4ca4da54c3b53a1d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  restartAction:
+    m_UseReference: 1
+    m_Action:
+      m_Name: Restart
+      m_Type: 0
+      m_ExpectedControlType: 
+      m_Id: ae5ac697-561d-492f-82b3-ebbcf31485c8
+      m_Processors: 
+      m_Interactions: 
+      m_SingletonActionBindings: []
+      m_Flags: 0
+    m_Reference: {fileID: 9154629579090808090, guid: a4f8aa6dbb533db4b90ec815676412ee, type: 3}
+  holdDuration: 3
+  playerRoot: {fileID: 693368401}
 --- !u!1 &1138640740
 GameObject:
   m_ObjectHideFlags: 0

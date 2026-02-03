@@ -67,7 +67,8 @@ public class SimpleEnemyAI : MonoBehaviour
         if (groanTimer >= groanInterval)
         {
             if (!string.IsNullOrEmpty(groanSE))
-                AudioManager.Instance.PlaySE(groanSE, transform.position);
+                AudioManager.Instance.PlaySE(groanSE, transform.position, 1.0f, 1.0f, 1.0f, 30.0f);
+                Debug.Log("Enemy groans");
             groanTimer = 0f;
         }
 

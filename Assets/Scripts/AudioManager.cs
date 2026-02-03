@@ -80,7 +80,7 @@ public class AudioManager : MonoBehaviour
     // spatialBlend: 0=2D, 1=3D (デフォルト1)
     // minDistance: この距離までは最大音量 (デフォルト1m)
     // maxDistance: 音が聞こえなくなる距離 (デフォルト20m)
-    public void PlaySE(string name, Vector3 position, float pitchScale = 1.0f, float spatialBlend = 1.0f, float minDistance = 1.0f, float maxDistance = 20.0f)
+public void PlaySE(string name, Vector3 position, float pitchScale = 1.0f, float spatialBlend = 1.0f, float minDistance = 1.0f, float maxDistance = 20.0f)
     {
         if (seDict.TryGetValue(name, out SoundData sound))
         {
@@ -94,13 +94,14 @@ public class AudioManager : MonoBehaviour
             // ピッチ
             tempSource.pitch = sound.pitch * pitchScale;
 
-            // ★追加した設定を適用
-            tempSource.spatialBlend = spatialBlend;
+            // 3D設定
+            tempSource.spatialBlend = spatialBlend; // 1.0fなら完全3D
             tempSource.minDistance = minDistance;
             tempSource.maxDistance = maxDistance;
             
-            // 減衰カーブ（対数）
-            tempSource.rolloffMode = AudioRolloffMode.Logarithmic;
+            // 修正箇所: 対数(Logarithmic)から線形(Linear)に変更
+            // これにより maxDistance で音量が必ず 0 になります
+            tempSource.rolloffMode = AudioRolloffMode.Linear;
 
             tempSource.Play();
 
