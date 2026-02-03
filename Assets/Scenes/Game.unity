@@ -18574,8 +18574,8 @@ MonoBehaviour:
   gameClearUI: {fileID: 0}
   fireworkPrefab: {fileID: 6983632133577134245, guid: 7ea6220e62366fc448ad71f0bed9ce67, type: 3}
   fireworkCenter: {fileID: 328787304}
-  minRadius: 60
-  maxRadius: 70
+  minRadius: 30
+  maxRadius: 60
   heightRange: 20
   minInterval: 0.01
   maxInterval: 0.5
@@ -25141,7 +25141,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6365559658081473587, guid: a060b9aa3c853ef43ae0369e96eae7dd, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -28015,7 +28015,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6365559658081473587, guid: a060b9aa3c853ef43ae0369e96eae7dd, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -28721,7 +28721,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6365559658081473587, guid: a060b9aa3c853ef43ae0369e96eae7dd, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
